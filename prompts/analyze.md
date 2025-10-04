@@ -158,24 +158,7 @@
 
 ## 下一步操作
 
-**请立即使用 build 工具生成 Spec Kit 命令**，参数如下：
-
-\`\`\`
-requirementsSummaryFilePath: "{{requirementsSummaryFilePath}}"
-\`\`\`
-
-该工具将生成完整的 7 条 Spec Kit 命令：
-1. /constitution - 项目原则
-2. /specify - 功能规格
-3. /clarify - 技术细节澄清
-4. /plan - 技术方案
-5. /tasks - 任务分解
-6. /analyze - 风险分析
-7. /implement - 实现指南
-
-**输出要求：**
-
-在调用工具之前，请先将需求总结写入文件：`{{requirementsSummaryFilePath}}`
+**第一步：** 将需求总结写入文件：`{{requirementsSummaryFilePath}}`
 
 使用 `write` 工具写入以下 JSON 格式：
 \`\`\`json
@@ -186,12 +169,30 @@ requirementsSummaryFilePath: "{{requirementsSummaryFilePath}}"
 }
 \`\`\`
 
-然后调用 build 工具，传递该文件路径：
-\`\`\`
-requirementsSummaryFilePath: "{{requirementsSummaryFilePath}}"
+**第二步：** 调用 MCP 工具 `mcp_spec-kit-ui_build` 生成 Spec Kit 命令
+
+**必须使用以下格式调用工具：**
+
+\`\`\`json
+{
+  "requirementsSummaryFilePath": "{{requirementsSummaryFilePath}}"
+}
 \`\`\`
 
-**现在请执行上述操作。**
+**完整调用示例：**
+- 工具名称：`mcp_spec-kit-ui_build`
+- 参数对象：包含一个 `requirementsSummaryFilePath` 字段，值为上面写入的文件路径
+
+该工具将生成完整的 7 条 Spec Kit 命令：
+1. /constitution - 项目原则
+2. /specify - 功能规格
+3. /clarify - 技术细节澄清
+4. /plan - 技术方案
+5. /tasks - 任务分解
+6. /analyze - 风险分析
+7. /implement - 实现指南
+
+**现在请立即执行这两个步骤！**
 ```
 
 ---
@@ -262,31 +263,41 @@ requirementsSummaryFilePath: "{{requirementsSummaryFilePath}}"
 
 ## 下一步操作
 
-**🚨 必须立即调用 gather 工具！不要调用 build 工具！**
+**🚨 必须立即调用 MCP 工具 `mcp_spec-kit-ui_gather`！不要调用 build 工具！**
 
-**请立即使用 gather 工具生成补充问题配置**，参数如下：
+**必须使用以下格式调用工具：**
 
+\`\`\`json
+{
+  "projectIdea": "（将上面的'完善的需求描述'完整文本作为字符串传入）",
+  "userResponse": "（将本轮的用户回答作为字符串传入）",
+  "previousFeedback": "（包含以下内容：
+    1. 需要明确的问题列表
+    2. 如果用户表示不确定，提供具体的建议和推荐
+       例如：'关于移动框架选择，根据你的需求（个人记账APP），推荐以下方案：
+       - React Native：跨平台，生态丰富，开发效率高，适合快速开发
+       - Flutter：性能优秀，UI漂亮，但需要学习Dart语言
+       - uni-app：可同时发布到多个小程序，适合需要小程序版本
+
+       请选择一个方案，或告诉我你更关注哪些方面（性能/开发效率/学习成本等），我可以进一步推荐。'
+    3. 如果有补充选项，在这里说明
+  ）",
+  "sessionId": "{{sessionId}}"
+}
 \`\`\`
-projectIdea: "（将上面的'完善的需求描述'完整文本作为字符串传入）"
-userResponse: "（将本轮的用户回答作为字符串传入）"
-previousFeedback: "（包含以下内容：
-  1. 需要明确的问题列表
-  2. 如果用户表示不确定，提供具体的建议和推荐
-     例如：'关于移动框架选择，根据你的需求（个人记账APP），推荐以下方案：
-     - React Native：跨平台，生态丰富，开发效率高，适合快速开发
-     - Flutter：性能优秀，UI漂亮，但需要学习Dart语言
-     - uni-app：可同时发布到多个小程序，适合需要小程序版本
 
-     请选择一个方案，或告诉我你更关注哪些方面（性能/开发效率/学习成本等），我可以进一步推荐。'
-  3. 如果有补充选项，在这里说明
-）"
-sessionId: "{{sessionId}}"
-\`\`\`
+**完整调用示例：**
+- 工具名称：`mcp_spec-kit-ui_gather`
+- 参数对象：包含四个字段
+  - `projectIdea`（必填）：完善的需求描述文本
+  - `userResponse`（可选）：本轮用户回答文本
+  - `previousFeedback`（可选）：需要明确的问题和建议
+  - `sessionId`（可选）：会话 ID，用于继续当前会话
 
 **🔴 关键要求：**
 1. **必须**使用上面生成的"完善的需求描述"作为 `projectIdea` 参数
 2. **必须**调用 gather 工具，不要调用 build 工具
-3. **必须**传入 sessionId 参数以继续当前会话
+3. **必须**传入 sessionId 参数以继续当前会话（值为：{{sessionId}}）
 4. **如果用户表示不确定**，在 `previousFeedback` 中提供具体的建议和推荐方案
 5. 推荐方案要具体，包含每个选项的特点、适用场景、优缺点
 6. 这样下一轮提问会基于更完善的需求和建议进行
@@ -294,7 +305,7 @@ sessionId: "{{sessionId}}"
 
 该工具将生成针对性的补充问题配置，并自动打开可视化配置界面让用户填写。
 
-**现在立即调用 gather 工具！**
+**现在立即调用工具！**
 ```
 
 ---

@@ -60,7 +60,7 @@ function getFileName(step: number, toolName: string, type: 'request' | 'response
 }
 
 // MCP 服务器实例
-const mcpServer = new McpServer({ name: "spec-kit-ui-mcp", version: "1.0.0", });
+const mcpServer = new McpServer({ name: "spec-kit-ui", version: "1.0.4", });
 
 // 注册工具1：收集需求信息
 mcpServer.registerTool(

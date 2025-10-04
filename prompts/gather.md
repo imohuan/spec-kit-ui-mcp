@@ -322,9 +322,26 @@
 
 ## 输出要求
 
-将生成的需求配置 JSON 写入文件：`{{configFilePath}}`
+**第一步：** 将生成的需求配置 JSON 写入文件：`{{configFilePath}}`
 
-然后调用 `configure` 工具并传递该文件路径，打开可视化配置界面。
+使用 `write` 工具，将上述生成的完整 JSON 对象写入该文件。
+
+**第二步：** 调用 MCP 工具 `mcp_spec-kit-ui_configure` 打开可视化配置界面
+
+**必须使用以下格式调用工具：**
+
+```json
+{
+  "configFilePath": "{{configFilePath}}"
+}
+```
+
+**完整调用示例：**
+
+- 工具名称：`mcp_spec-kit-ui_configure`
+- 参数对象：包含一个 `configFilePath` 字段，值为上面写入的文件路径
+
+**现在请立即执行这两个步骤！**
 
 ---
 
