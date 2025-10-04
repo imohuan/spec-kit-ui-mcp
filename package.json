@@ -1,6 +1,6 @@
 {
   "name": "spec-kit-ui-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Interactive MCP server for collecting project requirements and generating Spec Kit commands with visual UI",
   "type": "module",
   "main": "./build/index.js",
@@ -17,7 +17,8 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "dev": "node --loader ts-node/esm src/index.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "publish:release": "node scripts/publish.js"
   },
   "keywords": [
     "mcp",
