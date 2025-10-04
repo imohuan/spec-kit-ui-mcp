@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spec Kit 命令生成结果</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <script src="javascript/tailwindcss.js"></script>
+  <script src="javascript/vue.global.js"></script>
+  <script src="components/header.js"></script>
+  <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* 确保header导航按钮不换行 */
+    nav {
+      flex-shrink: 0;
+    }
+
+    .code-block {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .loading-spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #8b5cf6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <div id="app"></div>
+
+  <!-- 页面模板 -->
+  <script type="text/x-template" id="preview-template">
+    <div class="min-h-screen flex flex-col">
+      <!-- Navigation Header -->
+      <page-header current-page="preview"></page-header>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="container mx-auto px-4 py-16 mt-8">
+        <div class="text-center">
+          <div class="loading-spinner mx-auto mb-4"></div>
+          <p class="text-gray-600">正在加载命令结果...</p>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="error" class="container mx-auto px-4 py-16 mt-8">
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg max-w-2xl mx-auto">
+          <h2 class="text-xl font-bold text-red-800 mb-2">❌ 加载失败</h2>
+          <p class="text-red-700">{{ error }}</p>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div v-else class="flex-1 container mx-auto px-4 py-12 mt-8">
+        <!-- Project Selection -->
+        <div v-if="projects.length > 1" class="max-w-6xl mx-auto mb-8">
+          <div class="bg-white rounded-lg shadow-lg p-6 fade-in-up">
+            <label class="block text-lg font-semibold text-gray-700 mb-3 flex items-center">
+              <span class="text-2xl mr-2">🎯</span>
+              选择项目
+            </label>
+            <select 
+              v-model="selectedProject" 
+              @change="onProjectChange"
+              class="w-full px-4 py-3 text-lg border-2 border-purple-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors bg-white cursor-pointer hover:border-purple-400"
+            >
+              <option v-for="project in projects" :key="project.filePath" :value="project.filePath">
+                {{ project.title }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Project Info Section -->
+        <div class="max-w-6xl mx-auto mb-12">
+          <div class="bg-white rounded-lg shadow-lg p-8 fade-in-up">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+              <span class="text-3xl mr-3">💡</span>
+              项目信息
+            </h2>
+            
+            <div class="space-y-6">
+              <div v-if="projectTitle">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">项目标题</h3>
+                <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+                  <p class="text-xl font-bold text-purple-900">{{ projectTitle }}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">项目想法</h3>
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                  <p class="text-gray-800">{{ projectIdea }}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">需求总结</h3>
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                  <p class="text-gray-800 whitespace-pre-wrap">{{ requirementsSummary }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commands Section -->
+        <div class="max-w-6xl mx-auto">
+          <h2 class="text-3xl font-bold text-center mb-8 text-gray-800">📚 生成的命令</h2>
+          
+          <!-- Tabs -->
+          <div class="flex flex-wrap gap-2 mb-8 justify-center">
+            <button 
+              v-for="cmd in commands" 
+              :key="cmd.id"
+              @click="activeTab = cmd.id"
+              class="px-4 py-2 rounded-lg font-semibold transition-all duration-300"
+              :class="activeTab === cmd.id ? getColorClass(commandMeta[cmd.id].color, 'bg') + ' text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+            >
+              {{ commandMeta[cmd.id].icon }} {{ commandMeta[cmd.id].name }}
+            </button>
+          </div>
+
+          <!-- Tab Content -->
+          <div v-for="cmd in commands" :key="cmd.id" v-show="activeTab === cmd.id" class="bg-white rounded-lg shadow-xl p-8 fade-in-up">
+            <div class="flex items-center mb-6">
+              <div class="text-5xl mr-4">{{ commandMeta[cmd.id].icon }}</div>
+              <div>
+                <div :class="getColorClass(commandMeta[cmd.id].color, 'text') + ' font-mono font-semibold'">
+                  {{ commandMeta[cmd.id].name }}
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800">{{ commandMeta[cmd.id].title }}</h3>
+              </div>
+            </div>
+
+            <!-- Command Content -->
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-lg font-bold text-gray-700">📝 命令内容</h4>
+                <button 
+                  @click="copyCode(commandMeta[cmd.id].name + ' ' + cmd.content, 'cmd-' + cmd.id)"
+                  class="px-4 py-2 rounded-lg transition-colors shadow font-semibold"
+                  :class="copyStates['cmd-' + cmd.id] ? 'bg-green-600 text-white' : getColorClass(commandMeta[cmd.id].color, 'bg') + ' hover:opacity-90 text-white'"
+                >
+                  {{ copyStates['cmd-' + cmd.id] ? '✅ 已复制' : '📋 复制命令' }}
+                </button>
+              </div>
+              <div class="code-block">{{ cmd.content }}</div>
+            </div>
+            
+
+            <!-- Why & What -->
+            <div class="mb-6 space-y-4">
+              <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                <h4 class="text-lg font-bold text-blue-700 mb-2">🤔 为什么需要？</h4>
+                <p class="text-gray-700 leading-relaxed">{{ commandMeta[cmd.id].why }}</p>
+              </div>
+              <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
+                <h4 class="text-lg font-bold text-green-700 mb-2">⚙️ 它做什么？</h4>
+                <p class="text-gray-700 leading-relaxed">{{ commandMeta[cmd.id].what }}</p>
+              </div>
+            </div>
+
+            <!-- Usage Tip -->
+            <div :class="'bg-' + commandMeta[cmd.id].color + '-50 p-6 rounded-lg border-l-4 ' + getColorClass(commandMeta[cmd.id].color, 'border')">
+              <h4 :class="'text-lg font-bold mb-2 ' + getColorClass(commandMeta[cmd.id].color, 'text')">
+                💡 使用提示
+              </h4>
+              <p class="text-gray-700">
+                直接复制上面的命令内容，在您的 AI 助手（如 Cursor、GitHub Copilot）中执行该命令即可。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="max-w-6xl mx-auto mt-12">
+          <div class="bg-white rounded-lg shadow-lg p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+              <span class="text-3xl mr-3">🚀</span>
+              下一步操作
+            </h2>
+            <div class="space-y-3 text-gray-700">
+              <div class="flex items-start">
+                <span class="text-purple-600 font-bold mr-3">1.</span>
+                <p>依次复制并执行这7条命令（按顺序：constitution → specify → clarify → plan → tasks → analyze → implement）</p>
+              </div>
+              <div class="flex items-start">
+                <span class="text-purple-600 font-bold mr-3">2.</span>
+                <p>每执行一条命令后，仔细阅读 AI 的输出，确认生成的内容符合您的期望</p>
+              </div>
+              <div class="flex items-start">
+                <span class="text-purple-600 font-bold mr-3">3.</span>
+                <p>如果某个环节需要调整，可以重新运行该命令并提供更详细的说明</p>
+              </div>
+              <div class="flex items-start">
+                <span class="text-purple-600 font-bold mr-3">4.</span>
+                <p>执行完 /implement 后，您的项目代码将自动生成</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="bg-gray-900 text-white py-8 mt-16">
+        <div class="container mx-auto px-4 text-center">
+          <p class="text-gray-400">
+            基于 <a href="https://github.com/github/spec-kit" class="text-purple-400 hover:text-purple-300" target="_blank">Spec Kit</a> 项目创建
+          </p>
+          <p class="text-gray-500 mt-2">祝您开发顺利！🎉</p>
+        </div>
+      </footer>
+    </div>
+  </script>
+
+  <script type="module">
+    const { createApp } = Vue;
+
+    createApp({
+      components: {
+        'page-header': HeaderComponent
+      },
+      setup() {
+        const loading = Vue.ref(true);
+        const error = Vue.ref(null);
+        const projectIdea = Vue.ref('');
+        const requirementsSummary = Vue.ref('');
+        const commands = Vue.ref([]);
+        const activeTab = Vue.ref('constitution');
+        const projects = Vue.ref([]);
+        const selectedProject = Vue.ref(null);
+        const projectTitle = Vue.ref('');
+
+        const commandMeta = {
+          constitution: {
+            name: '/constitution',
+            title: '项目原则',
+            icon: '📜',
+            color: 'purple',
+            why: '项目原则就像项目的"宪法"，为所有后续开发决策提供指导。它确保团队在代码质量、测试标准、用户体验和性能方面保持一致。',
+            what: '创建或更新 .specify/memory/constitution.md 文件，其中包含你的项目管理原则和开发指南。这些原则会在规格说明、计划和实现阶段被AI参考。'
+          },
+          specify: {
+            name: '/specify',
+            title: '功能规格',
+            icon: '📝',
+            color: 'blue',
+            why: '规格说明是整个开发流程的基础。它帮助你清晰地表达"想要构建什么"和"为什么要构建"，而不陷入技术实现细节。',
+            what: '创建一个详细的功能规格文档，包含用户故事、功能需求、验收标准等。AI会根据你的描述自动生成结构化的规格说明。'
+          },
+          clarify: {
+            name: '/clarify',
+            title: '澄清需求',
+            icon: '🔍',
+            color: 'green',
+            why: '初次描述的需求往往有模糊或遗漏的地方。在进入技术实现之前澄清这些问题，可以避免后期大量返工。',
+            what: 'AI会系统地审查你的规格说明，识别未明确的区域，并提出针对性问题。你的回答会被记录在规格文档的"澄清"部分。'
+          },
+          plan: {
+            name: '/plan',
+            title: '技术计划',
+            icon: '🏗️',
+            color: 'yellow',
+            why: '技术计划将抽象的业务需求转化为具体的实现方案。它定义了技术栈、架构模式、数据模型、API设计等关键技术决策。',
+            what: '生成详细的技术实现文档，包括架构设计、数据模型、API规范、技术栈选择等。AI会参考你的原则来做出技术决策。'
+          },
+          tasks: {
+            name: '/tasks',
+            title: '任务分解',
+            icon: '✅',
+            color: 'pink',
+            why: '将大型项目分解为小的、可管理的任务是成功交付的关键。任务分解确保每个步骤清晰、可测试，并且正确处理依赖关系。',
+            what: '根据技术计划生成详细的任务列表，包括每个任务的描述、实现细节、测试策略和依赖关系。'
+          },
+          analyze: {
+            name: '/analyze',
+            title: '风险分析',
+            icon: '🔬',
+            color: 'indigo',
+            why: '在开始实施之前，验证规格、计划和任务之间的一致性至关重要。这可以发现遗漏的需求、不匹配的实现，或者过度工程化的部分。',
+            what: '对比分析规格说明、技术计划和任务列表，检查是否所有需求都有对应的实现任务，是否有不必要的技术复杂度。'
+          },
+          implement: {
+            name: '/implement',
+            title: '实现指南',
+            icon: '🚀',
+            color: 'red',
+            why: '有了清晰的规格、计划和任务，就可以开始自动化实现了。/implement 命令让AI按照既定计划系统地构建你的应用。',
+            what: '按照任务列表的顺序自动执行所有任务，创建代码文件、运行测试、执行构建命令等。'
+          }
+        };
+
+        const loadProjects = async () => {
+          try {
+            const response = await fetch('/api/projects');
+            if (!response.ok) {
+              throw new Error('无法加载项目列表');
+            }
+            projects.value = await response.json();
+          } catch (err) {
+            console.error('加载项目列表失败:', err);
+          }
+        };
+
+        const loadProjectData = async (filePath) => {
+          try {
+            loading.value = true;
+            const response = await fetch(`/api/commands-result?commandsFilePath=${encodeURIComponent(filePath)}`);
+            if (!response.ok) {
+              throw new Error('无法加载命令结果');
+            }
+            const data = await response.json();
+            projectIdea.value = data.projectIdea || '';
+            requirementsSummary.value = data.requirementsSummary || '';
+            commands.value = data.commands || [];
+            projectTitle.value = data.title || data.projectIdea || '未命名项目';
+
+            if (commands.value.length > 0) {
+              activeTab.value = commands.value[0].id;
+            }
+          } catch (err) {
+            error.value = err.message;
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        const loadData = async () => {
+          try {
+            // 先加载项目列表
+            await loadProjects();
+
+            // 从 URL 参数获取命令文件路径
+            const urlParams = new URLSearchParams(window.location.search);
+            const commandsFilePath = urlParams.get('commandsFilePath');
+
+            if (commandsFilePath) {
+              // 如果有指定文件路径，加载该项目
+              selectedProject.value = commandsFilePath;
+              await loadProjectData(commandsFilePath);
+            } else if (projects.value.length > 0) {
+              // 否则加载第一个项目
+              selectedProject.value = projects.value[0].filePath;
+              await loadProjectData(projects.value[0].filePath);
+            } else {
+              throw new Error('没有找到任何项目');
+            }
+          } catch (err) {
+            error.value = err.message;
+            loading.value = false;
+          }
+        };
+
+        const onProjectChange = async () => {
+          if (selectedProject.value) {
+            await loadProjectData(selectedProject.value);
+          }
+        };
+
+        const copyStates = Vue.ref({});
+
+        const copyCode = (text, buttonId) => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyStates.value[buttonId] = true;
+            setTimeout(() => {
+              copyStates.value[buttonId] = false;
+            }, 2000);
+          }).catch(() => {
+            // 静默处理复制失败
+          });
+        };
+
+        const getColorClass = (color, type = 'bg') => {
+          const colorMap = {
+            purple: type === 'bg' ? 'bg-purple-600' : type === 'text' ? 'text-purple-600' : 'border-purple-600',
+            blue: type === 'bg' ? 'bg-blue-600' : type === 'text' ? 'text-blue-600' : 'border-blue-600',
+            green: type === 'bg' ? 'bg-green-600' : type === 'text' ? 'text-green-600' : 'border-green-600',
+            yellow: type === 'bg' ? 'bg-yellow-600' : type === 'text' ? 'text-yellow-600' : 'border-yellow-600',
+            pink: type === 'bg' ? 'bg-pink-600' : type === 'text' ? 'text-pink-600' : 'border-pink-600',
+            indigo: type === 'bg' ? 'bg-indigo-600' : type === 'text' ? 'text-indigo-600' : 'border-indigo-600',
+            red: type === 'bg' ? 'bg-red-600' : type === 'text' ? 'text-red-600' : 'border-red-600'
+          };
+          return colorMap[color] || colorMap.purple;
+        };
+
+        Vue.onMounted(() => {
+          loadData();
+        });
+
+        return {
+          loading,
+          error,
+          projectIdea,
+          requirementsSummary,
+          commands,
+          activeTab,
+          commandMeta,
+          copyCode,
+          copyStates,
+          getColorClass,
+          projects,
+          selectedProject,
+          projectTitle,
+          onProjectChange
+        };
+      },
+      template: '#preview-template'
+    }).mount('#app');
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spec Kit 指令详解</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <script src="javascript/tailwindcss.js"></script>
+  <script src="javascript/vue.global.js"></script>
+  <script src="components/header.js"></script>
+  <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .code-block {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+
+    /* 确保header导航按钮不换行 */
+    nav {
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <div id="app"></div>
+
+  <!-- 页面模板 -->
+  <script type="text/x-template" id="learn-template">
+    <div class="min-h-screen flex flex-col">
+      <!-- Navigation Header -->
+      <page-header current-page="learn"></page-header>
+
+      <!-- Content Area -->
+      <div class="flex-1 mt-8">
+        <!-- Interactive Process Visualization -->
+        <div class="bg-gray-50 py-16">
+          <div class="container mx-auto px-4 max-w-6xl">
+            <h2 class="text-3xl font-bold text-center mb-12 text-gray-800">🎯 可视化开发流程</h2>
+            
+            <!-- Progress Bar -->
+            <div class="mb-8">
+              <div class="flex justify-between items-center mb-4">
+                <div v-for="(step, index) in steps" :key="step.id" class="flex items-center" :class="index < steps.length - 1 ? 'flex-1' : ''">
+                  <div 
+                    @click="goToStep(index)"
+                    class="w-12 h-12 rounded-full flex items-center justify-center text-2xl cursor-pointer transition-all duration-300 transform hover:scale-110"
+                    :class="index === currentStep ? 'bg-purple-600 text-white shadow-lg scale-110' : index < currentStep ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'"
+                  >
+                    {{ step.icon }}
+                  </div>
+                  <div v-if="index < steps.length - 1" class="flex-1 h-2 mx-2 rounded"
+                    :class="index < currentStep ? 'bg-green-500' : 'bg-gray-300'">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Current Step Detail -->
+            <div class="bg-white rounded-lg shadow-xl p-8 mb-8 fade-in-up">
+              <div class="flex items-center mb-6">
+                <div class="text-5xl mr-4">{{ steps[currentStep].icon }}</div>
+                <div>
+                  <div class="text-sm text-purple-600 font-semibold">步骤 {{ steps[currentStep].id }}</div>
+                  <h3 class="text-2xl font-bold text-gray-800">{{ steps[currentStep].title }}</h3>
+                </div>
+              </div>
+              
+              <p class="text-gray-600 mb-6 text-lg">{{ steps[currentStep].description }}</p>
+              
+              <!-- Command -->
+              <div class="mb-6">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-sm font-semibold text-gray-700">命令：</label>
+                  <button 
+                    @click="copyCode(steps[currentStep].command, 'step-command')"
+                    class="text-sm px-3 py-1 rounded transition-colors"
+                    :class="copyStates['step-command'] ? 'bg-green-100 text-green-700' : 'bg-purple-100 hover:bg-purple-200 text-purple-700'"
+                  >
+                    {{ copyStates['step-command'] ? '✅ 已复制' : '📋 复制' }}
+                  </button>
+                </div>
+                <div class="code-block font-mono text-sm">
+                  <span class="text-green-400">$</span> {{ steps[currentStep].command }}
+                </div>
+              </div>
+              
+              <!-- Example (if exists) -->
+              <div v-if="steps[currentStep].example" class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="font-semibold text-amber-900 flex items-center">
+                    <span class="mr-2">💡</span> 中文示例
+                  </div>
+                  <button 
+                    @click="copyCode(steps[currentStep].example, 'step-example')"
+                    class="text-sm px-3 py-1 rounded transition-colors"
+                    :class="copyStates['step-example'] ? 'bg-green-200 text-green-800' : 'bg-amber-200 hover:bg-amber-300 text-amber-800'"
+                  >
+                    {{ copyStates['step-example'] ? '✅ 已复制' : '📋 复制示例' }}
+                  </button>
+                </div>
+                <p class="text-amber-900 text-sm leading-relaxed mt-2">{{ steps[currentStep].example }}</p>
+              </div>
+              
+              <!-- Navigation -->
+              <div class="flex justify-between mt-8">
+                <button 
+                  @click="prevStep"
+                  :disabled="currentStep === 0"
+                  class="px-6 py-3 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+                >
+                  ← 上一步
+                </button>
+                <button 
+                  @click="nextStep"
+                  :disabled="currentStep === steps.length - 1"
+                  class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+                >
+                  下一步 →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commands Reference -->
+        <div class="bg-white py-16">
+          <div class="container mx-auto px-4 max-w-6xl">
+            <h2 class="text-3xl font-bold text-center mb-12 text-gray-800">📚 命令详解</h2>
+            
+            <!-- Tabs -->
+            <div class="flex flex-wrap gap-2 mb-8 justify-center">
+              <button 
+                v-for="cmd in commands" 
+                :key="cmd.id"
+                @click="activeTab = cmd.id"
+                class="px-4 py-2 rounded-lg font-semibold transition-all duration-300"
+                :class="activeTab === cmd.id ? 'bg-purple-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+              >
+                {{ cmd.icon }} {{ cmd.name }}
+              </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div v-for="cmd in commands" :key="cmd.id" v-show="activeTab === cmd.id" class="bg-white rounded-lg shadow-xl p-8 fade-in-up">
+              <div class="flex items-center mb-6">
+                <div class="text-5xl mr-4">{{ cmd.icon }}</div>
+                <div>
+                  <div class="text-purple-600 font-mono">{{ cmd.name }}</div>
+                  <h3 class="text-2xl font-bold text-gray-800">{{ cmd.title }}</h3>
+                </div>
+              </div>
+
+              <!-- Why -->
+              <div class="mb-6">
+                <h4 class="text-lg font-bold text-blue-600 mb-2">{{ cmd.why }}</h4>
+                <p class="text-gray-700 leading-relaxed">{{ cmd.whyContent }}</p>
+              </div>
+
+              <!-- What -->
+              <div class="mb-6">
+                <h4 class="text-lg font-bold text-green-600 mb-2">{{ cmd.what }}</h4>
+                <p class="text-gray-700 leading-relaxed">{{ cmd.whatContent }}</p>
+              </div>
+
+              <!-- Example -->
+              <div class="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-lg font-bold text-purple-700">💡 中文示例</h4>
+                  <button 
+                    @click="copyCode(cmd.example, 'cmd-' + cmd.id + '-example')"
+                    class="text-sm px-4 py-2 rounded-lg transition-colors shadow"
+                    :class="copyStates['cmd-' + cmd.id + '-example'] ? 'bg-green-600 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'"
+                  >
+                    {{ copyStates['cmd-' + cmd.id + '-example'] ? '✅ 已复制' : '📋 复制示例' }}
+                  </button>
+                </div>
+                <div class="bg-white p-4 rounded border border-purple-200">
+                  <p class="text-gray-800 leading-relaxed font-mono text-sm">{{ cmd.example }}</p>
+                </div>
+              </div>
+
+              <!-- Tips -->
+              <div class="bg-amber-50 p-6 rounded-lg border border-amber-200">
+                <h4 class="text-lg font-bold text-amber-700 mb-3">💭 使用技巧</h4>
+                <ul class="space-y-2">
+                  <li v-for="(tip, index) in cmd.tips" :key="index" class="flex items-start">
+                    <span class="text-amber-500 mr-2">▸</span>
+                    <span class="text-gray-700">{{ tip }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Start CTA -->
+        <div class="gradient-bg text-white py-12">
+          <div class="container mx-auto px-4 text-center">
+            <h2 class="text-3xl font-bold mb-6">准备开始了吗？</h2>
+            <p class="text-xl mb-8 opacity-90">立即安装 Spec Kit，开启规格驱动开发之旅</p>
+            <div class="bg-white bg-opacity-20 backdrop-blur rounded-lg p-6 max-w-2xl mx-auto">
+              <div class="flex items-center justify-between">
+                <code class="text-left flex-1 font-mono">uv tool install specify-cli --from git+https://github.com/github/spec-kit.git</code>
+                <button 
+                  @click="copyCode('uv tool install specify-cli --from git+https://github.com/github/spec-kit.git', 'install-command')"
+                  class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors"
+                  :class="copyStates['install-command'] ? 'bg-green-100 text-green-600' : 'bg-white text-purple-600 hover:bg-opacity-90'"
+                >
+                  {{ copyStates['install-command'] ? '✅ 已复制' : '📋 复制' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="bg-gray-900 text-white py-8">
+        <div class="container mx-auto px-4 text-center">
+          <p class="text-gray-400">
+            基于 <a href="https://github.com/github/spec-kit" class="text-purple-400 hover:text-purple-300" target="_blank">Spec Kit</a> 项目创建
+          </p>
+          <p class="text-gray-500 mt-2">MIT License</p>
+        </div>
+      </footer>
+    </div>
+  </script>
+
+  <script type="module">
+    const { createApp } = Vue;
+
+    createApp({
+      components: {
+        'page-header': HeaderComponent
+      },
+      setup() {
+        const currentStep = Vue.ref(0);
+        const activeTab = Vue.ref('constitution');
+
+        const steps = [
+          {
+            id: 1,
+            title: '安装 Specify',
+            icon: '📦',
+            command: 'uv tool install specify-cli --from git+https://github.com/github/spec-kit.git',
+            description: '一次安装，随处使用。工具将保持安装状态并在 PATH 中可用。'
+          },
+          {
+            id: 2,
+            title: '建立项目原则',
+            icon: '📜',
+            command: '/constitution',
+            description: '创建项目的管理原则和开发指南，这将指导所有后续开发。',
+            example: '/constitution 创建专注于代码质量、测试标准、用户体验一致性和性能要求的原则。要求所有新功能必须有单元测试覆盖，UI组件必须支持响应式设计，API响应时间不超过200ms。'
+          },
+          {
+            id: 3,
+            title: '创建规格说明',
+            icon: '📝',
+            command: '/specify',
+            description: '描述你想要构建的内容。专注于做什么和为什么，而不是技术栈。',
+            example: '/specify 构建一个任务管理应用Taskify。允许用户创建项目、添加团队成员、分配任务、评论，并以看板方式在不同状态间移动任务。'
+          },
+          {
+            id: 4,
+            title: '澄清需求',
+            icon: '🔍',
+            command: '/clarify',
+            description: '在创建技术计划之前，澄清未明确的需求区域。这一步骤有助于减少后续的返工。',
+            example: '/clarify 请帮我澄清规格中未明确的部分，特别是关于用户交互、数据持久化和边界情况的处理。'
+          },
+          {
+            id: 5,
+            title: '创建技术计划',
+            icon: '🏗️',
+            command: '/plan',
+            description: '提供你的技术栈和架构选择。这是你明确"如何实现"的地方。',
+            example: '/plan 使用 .NET Aspire 框架，Postgres 作为数据库。前端使用 Blazor Server，支持拖放任务板和实时更新。'
+          },
+          {
+            id: 6,
+            title: '分解任务',
+            icon: '✅',
+            command: '/tasks',
+            description: '从实现计划中创建可执行的任务列表。AI 会自动分解任务并建立依赖关系。',
+            example: '/tasks 请根据技术计划生成详细的任务列表，包括每个任务的依赖关系和预估时间。'
+          },
+          {
+            id: 7,
+            title: '分析一致性',
+            icon: '🔬',
+            command: '/analyze',
+            description: '在实施前进行跨工件一致性和覆盖率分析，确保所有需求都有对应的任务。',
+            example: '/analyze 检查规格、计划和任务之间的一致性，确保没有遗漏的需求。'
+          },
+          {
+            id: 8,
+            title: '执行实现',
+            icon: '🚀',
+            command: '/implement',
+            description: '执行所有任务并根据计划构建功能。AI 会按照依赖顺序自动执行任务。',
+            example: '/implement 开始按照任务列表实施项目，遵循TDD方法，确保每个任务完成后都有相应的测试。'
+          }
+        ];
+
+        const commands = [
+          {
+            id: 'constitution',
+            name: '/constitution',
+            title: '建立项目原则',
+            icon: '📜',
+            why: '为什么需要？',
+            whyContent: '项目原则就像项目的"宪法"，为所有后续开发决策提供指导。它确保团队在代码质量、测试标准、用户体验和性能方面保持一致。',
+            what: '它做什么？',
+            whatContent: '创建或更新 .specify/memory/constitution.md 文件，其中包含你的项目管理原则和开发指南。',
+            example: '/constitution 创建专注于代码质量、测试标准、用户体验一致性和性能要求的原则。要求：1) 所有新功能必须有单元测试覆盖率达到80%以上 2) UI组件必须支持移动端和桌面端响应式设计 3) API响应时间不超过200ms',
+            tips: [
+              '明确代码质量标准（如测试覆盖率、代码规范）',
+              '定义性能指标（如响应时间、加载速度）',
+              '说明用户体验要求（如可访问性、响应式设计）',
+              '指定技术偏好（如使用成熟库 vs 自己实现）'
+            ]
+          },
+          {
+            id: 'specify',
+            name: '/specify',
+            title: '定义需求',
+            icon: '📝',
+            why: '为什么需要？',
+            whyContent: '规格说明是整个开发流程的基础。它帮助你清晰地表达"想要构建什么"和"为什么要构建"，而不陷入技术实现细节。',
+            what: '它做什么？',
+            whatContent: '创建一个详细的功能规格文档，包含用户故事、功能需求、验收标准等。AI会根据你的描述自动生成结构化的规格说明。',
+            example: '/specify 构建一个在线书店应用。用户可以浏览图书目录、搜索图书、查看图书详情、添加到购物车、管理购物车、下单购买。',
+            tips: [
+              '专注于业务价值和用户需求，不要提及具体技术',
+              '描述用户能做什么，而不是系统如何实现',
+              '包含关键的用户交互流程',
+              '说明重要的业务规则和约束'
+            ]
+          },
+          {
+            id: 'clarify',
+            name: '/clarify',
+            title: '澄清需求',
+            icon: '🔍',
+            why: '为什么需要？',
+            whyContent: '初次描述的需求往往有模糊或遗漏的地方。在进入技术实现之前澄清这些问题，可以避免后期大量返工。',
+            what: '它做什么？',
+            whatContent: 'AI会系统地审查你的规格说明，识别未明确的区域，并提出针对性问题。你的回答会被记录在规格文档的"澄清"部分。',
+            example: '/clarify 请审查我的规格说明，特别关注：1) 用户权限和访问控制 2) 数据验证规则 3) 错误处理和边界情况 4) 性能要求和并发处理',
+            tips: [
+              '在运行 /plan 之前必须完成此步骤',
+              '仔细回答AI的每个问题',
+              '如果是探索性原型，可以明确跳过此步骤',
+              '可以多次运行直到所有问题都清晰'
+            ]
+          },
+          {
+            id: 'plan',
+            name: '/plan',
+            title: '技术规划',
+            icon: '🏗️',
+            why: '为什么需要？',
+            whyContent: '技术计划将抽象的业务需求转化为具体的实现方案。它定义了技术栈、架构模式、数据模型、API设计等关键技术决策。',
+            what: '它做什么？',
+            whatContent: '生成详细的技术实现文档，包括架构设计、数据模型、API规范、技术栈选择等。AI会参考你的原则来做出技术决策。',
+            example: '/plan 使用以下技术栈：前端采用 Vue 3 + TypeScript + Vite + Tailwind CSS，状态管理使用 Pinia。后端使用 Node.js + Express，数据库使用 PostgreSQL。',
+            tips: [
+              '明确指定你熟悉或偏好的技术栈',
+              '说明架构模式（如微服务、单体应用）',
+              '考虑性能、可扩展性、安全性要求',
+              '可以要求AI研究最新的框架版本'
+            ]
+          },
+          {
+            id: 'tasks',
+            name: '/tasks',
+            title: '任务分解',
+            icon: '✅',
+            why: '为什么需要？',
+            whyContent: '将大型项目分解为小的、可管理的任务是成功交付的关键。任务分解确保每个步骤清晰、可测试，并且正确处理依赖关系。',
+            what: '它做什么？',
+            whatContent: '根据技术计划生成详细的任务列表，包括每个任务的描述、实现细节、测试策略和依赖关系。',
+            example: '/tasks 请根据技术计划生成任务列表。每个任务应该：1) 可以在2-4小时内完成 2) 包含明确的验收标准 3) 包含单元测试要求',
+            tips: [
+              '任务粒度要适中，不要太大或太小',
+              '确保每个任务都有明确的完成标准',
+              '考虑任务之间的依赖关系',
+              '可以要求按照特定顺序组织任务'
+            ]
+          },
+          {
+            id: 'analyze',
+            name: '/analyze',
+            title: '一致性分析',
+            icon: '🔬',
+            why: '为什么需要？',
+            whyContent: '在开始实施之前，验证规格、计划和任务之间的一致性至关重要。这可以发现遗漏的需求、不匹配的实现，或者过度工程化的部分。',
+            what: '它做什么？',
+            whatContent: '对比分析规格说明、技术计划和任务列表，检查是否所有需求都有对应的实现任务，是否有不必要的技术复杂度。',
+            example: '/analyze 请进行全面分析：1) 检查spec.md中的每个用户故事是否都有对应的任务 2) 验证tasks.md中的任务是否都对应某个实际需求',
+            tips: [
+              '在 /tasks 之后、/implement 之前运行',
+              '仔细审查分析报告中指出的问题',
+              '根据分析结果调整规格、计划或任务',
+              '确保没有需求遗漏或过度设计'
+            ]
+          },
+          {
+            id: 'implement',
+            name: '/implement',
+            title: '执行实现',
+            icon: '🚀',
+            why: '为什么需要？',
+            whyContent: '有了清晰的规格、计划和任务，就可以开始自动化实现了。/implement 命令让AI按照既定计划系统地构建你的应用。',
+            what: '它做什么？',
+            whatContent: '按照任务列表的顺序自动执行所有任务，创建代码文件、运行测试、执行构建命令等。',
+            example: '/implement 开始实施项目。请：1) 按照tasks.md中定义的顺序执行 2) 每完成一个任务就运行相应的测试 3) 遵循TDD方法',
+            tips: [
+              '确保已安装所需的开发工具',
+              'AI会执行本地CLI命令，需要相应权限',
+              '实现完成后要进行完整测试',
+              '浏览器控制台的错误可能需要手动检查'
+            ]
+          }
+        ];
+
+        const nextStep = () => {
+          if (currentStep.value < steps.length - 1) {
+            currentStep.value++;
+          }
+        };
+
+        const prevStep = () => {
+          if (currentStep.value > 0) {
+            currentStep.value--;
+          }
+        };
+
+        const goToStep = (index) => {
+          currentStep.value = index;
+        };
+
+        const copyStates = Vue.ref({});
+
+        const copyCode = (text, buttonId) => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyStates.value[buttonId] = true;
+            setTimeout(() => {
+              copyStates.value[buttonId] = false;
+            }, 2000);
+          }).catch(() => {
+            // 静默处理复制失败
+          });
+        };
+
+        return {
+          currentStep,
+          steps,
+          commands,
+          activeTab,
+          nextStep,
+          prevStep,
+          goToStep,
+          copyCode,
+          copyStates
+        };
+      },
+      template: '#learn-template'
+    }).mount('#app');
+  </script>
+</body>
+
+</html>

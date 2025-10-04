@@ -1,0 +1,59 @@
+{
+  "name": "spec-kit-ui-mcp",
+  "version": "1.0.0",
+  "description": "Interactive MCP server for collecting project requirements and generating Spec Kit commands with visual UI",
+  "type": "module",
+  "main": "./build/index.js",
+  "bin": {
+    "spec-kit-ui-mcp": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "prompts",
+    "public"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "spec-kit",
+    "requirements",
+    "requirements-gathering",
+    "interactive",
+    "ai",
+    "code-generation",
+    "project-planning",
+    "specification"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imohuan/spec-kit-ui-mcp.git"
+  },
+  "homepage": "https://github.com/imohuan/spec-kit-ui-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/imohuan/spec-kit-ui-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "express": "^4.18.2",
+    "open": "^10.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spec Kit 需求配置器</title>
+  <link rel="icon" type="image/png" href="icon.png" />
+  <script src="javascript/tailwindcss.js"></script>
+  <script src="javascript/vue.global.js"></script>
+  <script src="components/header.js"></script>
+  <style>
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* 确保header导航按钮不换行 */
+    nav {
+      flex-shrink: 0;
+    }
+
+    /* 任务导航卡片 */
+    .question-nav-card {
+      position: sticky;
+      top: 100px;
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+
+    /* 滚动条样式 */
+    .question-nav-card::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .question-nav-card::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .question-nav-card::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+
+    .question-nav-card::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <div id="app"></div>
+
+  <!-- 页面模板 -->
+  <script type="text/x-template" id="configure-template">
+    <div class="min-h-screen flex flex-col">
+      <!-- Navigation Header -->
+      <page-header current-page="configure"></page-header>
+    
+      <!-- Main Content -->
+      <div class="flex-1 container mx-auto px-4 py-8">
+        <!-- Project Selection -->
+        <div v-if="projects.length > 1 && !loading && !loadError && !submitted" class="max-w-7xl mx-auto mb-6">
+          <div class="bg-white rounded-lg shadow-lg p-6">
+            <label class="block text-lg font-semibold text-gray-700 mb-3 flex items-center">
+              <span class="text-2xl mr-2">🎯</span>
+              选择项目
+            </label>
+            <select v-model="selectedProject" @change="handleProjectChange"
+              class="w-full px-4 py-3 text-lg border-2 border-purple-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors bg-white cursor-pointer hover:border-purple-400">
+              <option v-for="project in projects" :key="project.filePath" :value="project.filePath">
+                {{ project.filePath }}
+              </option>
+            </select>
+          </div>
+        </div>
+    
+        <div class="max-w-7xl mx-auto" :class="submitted || loading || loadError ? '' : 'grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-6'">
+          <!-- 左侧：任务内容 -->
+          <div class="bg-white rounded-2xl shadow-2xl overflow-hidden" :class="submitted || loading || loadError ? 'max-w-3xl mx-auto' : ''">
+            <!-- Page Header -->
+            <div class="gradient-bg text-white py-8 px-8 text-center">
+              <h2 class="text-3xl font-bold mb-2">配置您的项目需求</h2>
+              <p class="text-purple-100 text-base">通过可视化界面快速配置您的项目需求</p>
+            </div>
+    
+            <!-- Loading -->
+            <div v-if="loading" class="text-center py-16 px-5 text-gray-600">
+              <div
+                class="inline-block w-10 h-10 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin mb-5">
+              </div>
+              <p>正在加载配置...</p>
+            </div>
+    
+            <!-- Load Error -->
+            <div v-else-if="loadError" class="text-center py-16 px-5">
+              <p class="text-red-500">❌ 加载失败: {{ loadError }}</p>
+            </div>
+    
+            <!-- Success Message -->
+            <div v-else-if="submitted" class="text-center py-16 px-5">
+              <div class="text-6xl mb-5">✅</div>
+              <h2 class="text-2xl font-bold mb-2 text-green-600">提交成功！</h2>
+              <p class="text-gray-600 mb-4">您的需求已成功提交，正在处理中...</p>
+              <p class="text-gray-500 text-sm">您可以关闭此窗口了</p>
+            </div>
+    
+            <!-- Content -->
+            <div v-else-if="config">
+              <div class="p-8">
+                <!-- Project Info -->
+                <div v-if="config.projectName || config.projectDescription" class="bg-gray-50 p-5 rounded-lg mb-8">
+                  <h2 class="text-gray-800 text-xl font-semibold mb-2">
+                    {{ config.projectName || '项目配置' }}
+                  </h2>
+                  <p class="text-gray-600 leading-relaxed">
+                    {{ config.projectDescription || '' }}
+                  </p>
+                </div>
+    
+                <!-- Sections -->
+                <div v-for="(section, sectionIndex) in config.sections" :key="sectionIndex"
+                  class="mb-10 border-l-4 border-indigo-500 pl-5">
+    
+                  <!-- Section Header -->
+                  <div class="flex items-center mb-5">
+                    <div class="text-4xl mr-4">{{ section.icon || '📋' }}</div>
+                    <div class="flex-1">
+                      <h3 class="text-gray-800 text-xl font-semibold mb-1">{{ section.title }}</h3>
+                      <p class="text-gray-600 text-sm">{{ section.description || '' }}</p>
+                    </div>
+                  </div>
+    
+                  <!-- Questions -->
+                  <div v-for="(question, questionIndex) in section.questions" :key="questionIndex"
+                    :id="'question_' + getQuestionId(sectionIndex, questionIndex)"
+                    class="mb-6 p-5 bg-gray-50 rounded-lg scroll-mt-24">
+    
+                    <!-- Question Label -->
+                    <div class="flex items-center mb-3 text-gray-800 font-medium text-base">
+                      <span
+                        class="bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">{{
+                        getQuestionNumber(sectionIndex, questionIndex) }}</span>
+                      <span>{{ question.label }}</span>
+                      <span v-if="question.required" class="text-red-500 ml-1">*</span>
+                    </div>
+    
+                    <!-- Checkbox -->
+                    <div v-if="question.type === 'checkbox'" class="flex flex-wrap gap-2">
+                      <label v-for="(option, optionIndex) in question.options" :key="optionIndex"
+                        class="inline-flex items-center bg-white border-2 border-gray-200 rounded-lg px-4 py-2 cursor-pointer transition-all hover:border-indigo-500 hover:shadow-md">
+                        <input type="checkbox" 
+                          :id="getOptionId(sectionIndex, questionIndex, optionIndex)"
+                          v-model="answers[getQuestionId(sectionIndex, questionIndex)]"
+                          :value="option.value"
+                          class="mr-2 w-4 h-4 cursor-pointer text-indigo-600 focus:ring-indigo-500 rounded">
+                        <span class="text-sm">{{ option.label }}</span>
+                      </label>
+                    </div>
+    
+                    <!-- Radio -->
+                    <div v-else-if="question.type === 'radio'" class="flex flex-wrap gap-2">
+                      <label v-for="(option, optionIndex) in question.options" :key="optionIndex"
+                        class="inline-flex items-center bg-white border-2 border-gray-200 rounded-lg px-4 py-2 cursor-pointer transition-all hover:border-indigo-500 hover:shadow-md">
+                        <input type="radio" 
+                          :id="getOptionId(sectionIndex, questionIndex, optionIndex)"
+                          v-model="answers[getQuestionId(sectionIndex, questionIndex)]"
+                          :value="option.value"
+                          class="mr-2 w-4 h-4 cursor-pointer text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-sm">{{ option.label }}</span>
+                      </label>
+                      <!-- 自动添加"其他"选项 -->
+                      <label
+                        class="inline-flex items-center bg-white border-2 border-gray-200 rounded-lg px-4 py-2 cursor-pointer transition-all hover:border-indigo-500 hover:shadow-md">
+                        <input type="radio" 
+                          :id="getOptionId(sectionIndex, questionIndex, 'custom')"
+                          v-model="answers[getQuestionId(sectionIndex, questionIndex)]"
+                          value="__custom__"
+                          class="mr-2 w-4 h-4 cursor-pointer text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-sm">其他</span>
+                      </label>
+                    </div>
+    
+                    <!-- Text Input -->
+                    <input v-else-if="question.type === 'text'" 
+                      type="text" 
+                      :id="getQuestionId(sectionIndex, questionIndex)"
+                      v-model="answers[getQuestionId(sectionIndex, questionIndex)]"
+                      placeholder="请输入..."
+                      class="w-full p-3 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+    
+                    <!-- Textarea -->
+                    <textarea v-else-if="question.type === 'textarea'" 
+                      :id="getQuestionId(sectionIndex, questionIndex)"
+                      v-model="answers[getQuestionId(sectionIndex, questionIndex)]"
+                      placeholder="请输入..."
+                      class="w-full p-3 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition-colors resize-y min-h-[100px]"></textarea>
+    
+                    <!-- 自定义输入框（仅适用于 checkbox 和 radio） -->
+                    <input v-if="(question.type === 'checkbox') || (question.type === 'radio' && answers[getQuestionId(sectionIndex, questionIndex)] === '__custom__')" 
+                      type="text" 
+                      v-model="answers[getQuestionId(sectionIndex, questionIndex) + '_custom']"
+                      :placeholder="question.type === 'radio' ? '请在此输入自定义内容' : '或者自定义输入（可选）'"
+                      :class="[
+                        'w-full px-3 py-2 text-sm border-2 rounded-lg focus:outline-none transition-colors mt-3',
+                        question.type === 'radio' && answers[getQuestionId(sectionIndex, questionIndex)] === '__custom__'
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-300 focus:border-indigo-500'
+                      ]">
+    
+                    <!-- Example -->
+                    <div v-if="question.example"
+                      class="text-sm text-gray-600 mt-3 py-2 px-3 bg-white border-l-4 border-indigo-500 rounded">
+                      💡 示例：{{ question.example }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+    
+              <!-- Actions -->
+              <div class="flex justify-center py-8 px-8 bg-gray-50">
+                <button @click="submitAnswers" :disabled="submitting"
+                  class="px-10 py-4 text-base font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                  {{ submitting ? '提交中...' : '✅ 确认提交' }}
+                </button>
+              </div>
+            </div>
+          </div>
+    
+          <!-- 右侧：任务导航卡片 -->
+          <div v-if="config && !loading && !loadError && !submitted" class="hidden lg:block">
+            <div class="question-nav-card bg-white rounded-2xl shadow-2xl p-6">
+              <!-- 卡片标题 -->
+              <div class="text-center mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">回答进度</h3>
+                <div class="flex items-center justify-center gap-2 text-sm">
+                  <span class="text-gray-600">已答</span>
+                  <span class="text-indigo-600 font-bold text-lg">{{ answeredQuestions }}</span>
+                  <span class="text-gray-400">/</span>
+                  <span class="text-gray-600 font-bold text-lg">{{ totalQuestions }}</span>
+                </div>
+                <!-- 进度条 -->
+                <div class="mt-3 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-full transition-all duration-300"
+                    :style="{ width: totalQuestions > 0 ? (answeredQuestions / totalQuestions * 100) + '%' : '0%' }"></div>
+                </div>
+              </div>
+    
+              <!-- 任务网格 -->
+              <div class="grid grid-cols-5 gap-2">
+                <button v-for="item in flattenedQuestions" :key="`${item.sectionIndex}-${item.questionIndex}`"
+                  @click="scrollToQuestion(item.sectionIndex, item.questionIndex)" :class="[
+                      'w-full aspect-square rounded-lg text-sm font-semibold transition-all',
+                      'flex items-center justify-center',
+                      'hover:scale-110 hover:shadow-lg',
+                      item.isAnswered
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:border-indigo-400'
+                    ]" :title="item.question.label">
+                  {{ item.number }}
+                </button>
+              </div>
+    
+              <!-- 图例说明 -->
+              <div class="mt-6 pt-6 border-t border-gray-200 space-y-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-purple-600"></div>
+                  <span class="text-gray-600">已回答</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded bg-gray-100 border-2 border-gray-300"></div>
+                  <span class="text-gray-600">未回答</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+      <!-- Footer -->
+      <footer class="bg-gray-900 text-white py-8 mt-auto">
+        <div class="container mx-auto px-4 text-center">
+          <p class="text-gray-400">
+            基于 <a href="https://github.com/github/spec-kit" class="text-purple-400 hover:text-purple-300"
+              target="_blank">Spec Kit</a> 项目创建
+          </p>
+          <p class="text-gray-500 mt-2">MIT License</p>
+        </div>
+      </footer>
+    </div>
+    </script>
+
+  <script>
+    const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+    createApp({
+      components: {
+        "page-header": HeaderComponent,
+      },
+      setup() {
+        // 状态管理
+        const config = ref(null);
+        const loading = ref(true);
+        const loadError = ref("");
+        const submitted = ref(false);
+        const submitting = ref(false);
+        const answers = reactive({}); // 统一存储所有答案（使用 v-model 直接绑定）
+        const projects = ref([]); // 项目列表
+        const selectedProject = ref(null); // 当前选择的项目
+        const configFilePath = ref(""); // 当前配置文件路径
+
+        // 从 URL 参数获取配置文件路径
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlConfigPath = urlParams.get("configFilePath");
+
+        // 加载项目列表
+        const loadProjects = async () => {
+          try {
+            const response = await fetch("/api/gather-configs");
+            if (!response.ok) {
+              throw new Error("无法加载项目列表");
+            }
+            projects.value = await response.json();
+          } catch (err) {
+            // 静默处理错误
+          }
+        };
+
+        // 加载配置
+        const loadConfig = async (filePath) => {
+          try {
+            loading.value = true;
+            loadError.value = "";
+
+            if (!filePath) {
+              throw new Error("缺少配置文件路径参数");
+            }
+
+            configFilePath.value = filePath;
+            const url = `/api/config?configFilePath=${encodeURIComponent(
+              filePath
+            )}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error("无法加载配置");
+            }
+            config.value = await response.json();
+
+            // 立即初始化默认值（不需要延迟，因为使用 v-model）
+            initDefaultValues();
+          } catch (error) {
+            loadError.value = error.message;
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        // 收集答案（直接从 answers 响应式对象读取）
+        const collectAnswers = () => {
+          const result = [];
+
+          config.value.sections.forEach((section, sectionIndex) => {
+            section.questions.forEach((question, questionIndex) => {
+              const questionId = `q_${sectionIndex}_${questionIndex}`;
+              const answerValue = answers[questionId];
+              const customValue = answers[questionId + '_custom'];
+
+              let answer = "";
+
+              if (question.type === "checkbox") {
+                // checkbox：自定义内容附加到选项答案中
+                const selectedOptions = Array.isArray(answerValue) && answerValue.length > 0
+                  ? answerValue.join("、")
+                  : "";
+                const customPart = customValue && customValue.trim() ? customValue.trim() : "";
+
+                if (selectedOptions && customPart) {
+                  answer = `${selectedOptions}、${customPart}`;
+                } else {
+                  answer = selectedOptions || customPart;
+                }
+              } else if (question.type === "radio") {
+                // radio：如果选择了"其他"选项，使用自定义内容
+                if (answerValue === "__custom__") {
+                  answer = customValue && customValue.trim() ? customValue.trim() : "";
+                } else {
+                  answer = answerValue || "";
+                }
+              } else {
+                // text、textarea 直接使用值
+                answer = answerValue || "";
+              }
+
+              result.push({
+                section: section.title,
+                question: question.label,
+                answer: answer,
+                required: question.required || false,
+              });
+            });
+          });
+
+          return result;
+        };
+
+        // 提交答案（按照后台期望的格式发送数据）
+        const submitAnswers = async () => {
+          const collectedAnswers = collectAnswers();
+
+          // 检查必填项
+          const missingRequired = collectedAnswers.filter(
+            (a) => a.required && !a.answer
+          );
+          if (missingRequired.length > 0) {
+            alert(
+              "请填写所有必填项：\n" +
+              missingRequired.map((a) => `- ${a.question}`).join("\n")
+            );
+            return;
+          }
+
+          // 检查单选题：如果选择了"其他"但未填写自定义内容
+          const invalidCustom = [];
+          config.value.sections.forEach((section, sectionIndex) => {
+            section.questions.forEach((question, questionIndex) => {
+              if (question.type === "radio") {
+                const questionId = `q_${sectionIndex}_${questionIndex}`;
+                const selectedValue = answers[questionId];
+                const customValue = answers[questionId + '_custom'];
+                if (selectedValue === "__custom__" && (!customValue || !customValue.trim())) {
+                  invalidCustom.push(question.label);
+                }
+              }
+            });
+          });
+          if (invalidCustom.length > 0) {
+            alert(
+              '以下单选题选择了"其他"，请填写自定义内容：\n' +
+              invalidCustom.map((q) => `- ${q}`).join("\n")
+            );
+            return;
+          }
+
+          try {
+            submitting.value = true;
+            // 按照后台 formatUserAnswers 期望的格式发送数据
+            const response = await fetch("/api/submit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                answers: collectedAnswers  // 包装在 answers 属性中
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error("提交失败");
+            }
+
+            submitted.value = true;
+          } catch (error) {
+            alert("提交失败: " + error.message);
+          } finally {
+            submitting.value = false;
+          }
+        };
+
+        // 生成问题ID
+        const getQuestionId = (sectionIndex, questionIndex) => {
+          return `q_${sectionIndex}_${questionIndex}`;
+        };
+
+        // 生成选项ID
+        const getOptionId = (sectionIndex, questionIndex, optionIndex) => {
+          return `q_${sectionIndex}_${questionIndex}_${optionIndex}`;
+        };
+
+        // 检查问题是否已回答（直接检查 answers 对象）
+        const isQuestionAnswered = (questionId, questionType) => {
+          const value = answers[questionId];
+          const customValue = answers[questionId + '_custom'];
+
+          if (questionType === "checkbox") {
+            // checkbox：有选项或有自定义内容都算回答
+            const hasOptions = Array.isArray(value) && value.length > 0;
+            const hasCustom = customValue && customValue.trim();
+            return hasOptions || hasCustom;
+          } else if (questionType === "radio") {
+            // radio：如果选择了"其他"，需要检查自定义输入框是否有内容
+            if (value === "__custom__") {
+              return customValue && customValue.trim() !== "";
+            }
+            return value && typeof value === "string" && value.trim() !== "";
+          } else {
+            // text、textarea：直接检查值
+            return value && typeof value === "string" && value.trim() !== "";
+          }
+        };
+
+        // 获取任务序号
+        const getQuestionNumber = (sectionIndex, questionIndex) => {
+          let number = 1;
+          for (let i = 0; i < sectionIndex; i++) {
+            number += config.value.sections[i].questions.length;
+          }
+          number += questionIndex;
+          return number;
+        };
+
+        // 滚动到指定任务
+        const scrollToQuestion = (sectionIndex, questionIndex) => {
+          const questionId = `q_${sectionIndex}_${questionIndex}`;
+          const element = document.getElementById(`question_${questionId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        };
+
+        // 计算总任务数
+        const totalQuestions = computed(() => {
+          if (!config.value) return 0;
+          return config.value.sections.reduce(
+            (sum, section) => sum + section.questions.length,
+            0
+          );
+        });
+
+        // 计算已回答任务数（直接检查 answers 对象）
+        const answeredQuestions = computed(() => {
+          if (!config.value) return 0;
+
+          let count = 0;
+          config.value.sections.forEach((section, sectionIndex) => {
+            section.questions.forEach((question, questionIndex) => {
+              const questionId = `q_${sectionIndex}_${questionIndex}`;
+              if (isQuestionAnswered(questionId, question.type)) {
+                count++;
+              }
+            });
+          });
+          return count;
+        });
+
+        // 扁平化所有问题（用于渲染任务网格）
+        const flattenedQuestions = computed(() => {
+          if (!config.value) return [];
+
+          const result = [];
+          config.value.sections.forEach((section, sectionIndex) => {
+            section.questions.forEach((question, questionIndex) => {
+              const questionId = `q_${sectionIndex}_${questionIndex}`;
+              result.push({
+                sectionIndex,
+                questionIndex,
+                question,
+                questionId,
+                number: getQuestionNumber(sectionIndex, questionIndex),
+                // 直接检查 answers 对象
+                isAnswered: isQuestionAnswered(questionId, question.type)
+              });
+            });
+          });
+          return result;
+        });
+
+        // 初始化默认值（直接设置到 answers 对象）
+        const initDefaultValues = () => {
+          if (!config.value) return;
+
+          config.value.sections.forEach((section, sectionIndex) => {
+            section.questions.forEach((question, questionIndex) => {
+              const questionId = `q_${sectionIndex}_${questionIndex}`;
+
+              // 为 checkbox 初始化空数组（必须初始化，否则 v-model 不工作）
+              if (question.type === "checkbox" && !answers[questionId]) {
+                answers[questionId] = [];
+              }
+
+              // 设置默认值
+              if (question.defaultValue) {
+                if (question.type === "checkbox") {
+                  // checkbox: 转换为数组
+                  answers[questionId] = question.defaultValue
+                    .split("、")
+                    .map((v) => v.trim())
+                    .filter(v => v);
+                } else {
+                  // radio, text, textarea: 直接使用字符串
+                  answers[questionId] = question.defaultValue;
+                }
+              }
+            });
+          });
+        };
+
+        // 项目切换处理函数
+        const handleProjectChange = async (event) => {
+          const newPath = event.target.value;
+          if (!newPath || newPath === configFilePath.value) {
+            return;
+          }
+
+          // 清空之前的答案，避免残留状态
+          Object.keys(answers).forEach((key) => {
+            delete answers[key];
+          });
+
+          // 重置提交状态，确保切换后可以继续填写
+          submitted.value = false;
+
+          await loadConfig(newPath);
+          selectedProject.value = newPath;
+        };
+
+        // 页面加载时获取配置
+        onMounted(async () => {
+          try {
+            // 先加载项目列表
+            await loadProjects();
+
+            // 确定要加载的配置文件
+            let targetConfigPath = urlConfigPath;
+
+            if (targetConfigPath) {
+              // 如果URL中有指定路径，使用该路径
+              selectedProject.value = targetConfigPath;
+            } else if (projects.value.length > 0) {
+              // 否则使用第一个项目
+              selectedProject.value = projects.value[0].filePath;
+              targetConfigPath = projects.value[0].filePath;
+            } else {
+              throw new Error("没有找到任何配置项目");
+            }
+
+            // 加载选中的配置
+            await loadConfig(targetConfigPath);
+          } catch (error) {
+            loadError.value = error.message;
+            loading.value = false;
+          }
+        });
+
+        return {
+          config,
+          loading,
+          loadError,
+          submitted,
+          submitting,
+          answers,
+          projects,
+          selectedProject,
+          configFilePath,
+          submitAnswers,
+          handleProjectChange,
+          getQuestionId,
+          getOptionId,
+          getQuestionNumber,
+          scrollToQuestion,
+          totalQuestions,
+          answeredQuestions,
+          flattenedQuestions,
+        };
+      },
+
+      template: "#configure-template",
+    }).mount("#app");
+  </script>
+</body>
+
+</html>
