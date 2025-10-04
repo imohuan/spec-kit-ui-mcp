@@ -10,6 +10,59 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJsonPath = join(__dirname, '../package.json');
 
+// 解析命令行参数
+const args = process.argv.slice(2);
+const flags = {
+  yes: args.includes('--yes') || args.includes('-y'),
+  skipConfirm: args.includes('--skip-confirm'),
+  skipGitCheck: args.includes('--skip-git-check'),
+  patch: args.includes('--patch'),
+  minor: args.includes('--minor'),
+  major: args.includes('--major'),
+  version: null,
+  help: args.includes('--help') || args.includes('-h'),
+};
+
+// 检查自定义版本号
+const versionIndex = args.findIndex(arg => arg === '--version' || arg === '-v');
+if (versionIndex !== -1 && args[versionIndex + 1]) {
+  flags.version = args[versionIndex + 1];
+}
+
+// 显示帮助信息
+if (flags.help) {
+  console.log(`
+📦 自动化发布脚本
+
+用法:
+  node scripts/publish.js [选项]
+
+选项:
+  -y, --yes              跳过所有确认提示
+  --skip-confirm         跳过最终发布确认
+  --skip-git-check       跳过 Git 状态检查确认
+  --patch                自动选择 patch 版本更新 (x.y.Z)
+  --minor                自动选择 minor 版本更新 (x.Y.0)
+  --major                自动选择 major 版本更新 (X.0.0)
+  -v, --version <版本号>  指定自定义版本号 (格式: x.y.z)
+  -h, --help             显示帮助信息
+
+示例:
+  # 跳过所有确认，自动使用 patch 版本
+  node scripts/publish.js --yes --patch
+
+  # 指定版本号并跳过确认
+  node scripts/publish.js -y --version 1.5.0
+
+  # 只跳过最终确认
+  node scripts/publish.js --skip-confirm --minor
+
+  # 通过 npm 脚本使用
+  npm run push -- --yes --patch
+`);
+  process.exit(0);
+}
+
 // 颜色输出
 const colors = {
   reset: '\x1b[0m',
@@ -126,6 +179,22 @@ function checkGitBranch() {
 async function main() {
   log('\n🚀 开始发布流程...\n', 'bright');
 
+  // 显示使用的参数
+  const activeFlags = [];
+  if (flags.yes) activeFlags.push('--yes (跳过所有确认)');
+  if (flags.skipConfirm) activeFlags.push('--skip-confirm (跳过发布确认)');
+  if (flags.skipGitCheck) activeFlags.push('--skip-git-check (跳过 Git 检查)');
+  if (flags.patch) activeFlags.push('--patch (补丁版本)');
+  if (flags.minor) activeFlags.push('--minor (次版本)');
+  if (flags.major) activeFlags.push('--major (主版本)');
+  if (flags.version) activeFlags.push(`--version ${flags.version} (自定义版本)`);
+
+  if (activeFlags.length > 0) {
+    log('📝 使用的参数:', 'cyan');
+    activeFlags.forEach(flag => log(`   • ${flag}`, 'cyan'));
+    log('');
+  }
+
   // 1. 检查是否在Git仓库中
   try {
     exec('git rev-parse --git-dir', { silent: true });
@@ -144,10 +213,14 @@ async function main() {
     log('\n⚠️  检测到未提交的更改:', 'yellow');
     console.log(gitStatus);
 
-    const answer = await askQuestion('\n是否继续? 未提交的更改将被包含在发布中 (y/n): ');
-    if (answer.toLowerCase() !== 'y') {
-      log('❌ 发布已取消', 'red');
-      process.exit(0);
+    if (!flags.yes && !flags.skipGitCheck) {
+      const answer = await askQuestion('\n是否继续? 未提交的更改将被包含在发布中 (y/n): ');
+      if (answer.toLowerCase() !== 'y') {
+        log('❌ 发布已取消', 'red');
+        process.exit(0);
+      }
+    } else {
+      log('\n✅ 自动继续（使用 --yes 或 --skip-git-check 参数）', 'green');
     }
   }
 
@@ -184,42 +257,65 @@ async function main() {
   const baseVersion = npmVersion || currentVersion;
 
   if (!npmVersion || compareVersions(currentVersion, npmVersion) <= 0) {
-    log('\n请选择版本更新类型:', 'bright');
-    log(`  1. patch (补丁) - ${baseVersion} -> ${incrementVersion(baseVersion, 'patch')}`);
-    log(`  2. minor (次版本) - ${baseVersion} -> ${incrementVersion(baseVersion, 'minor')}`);
-    log(`  3. major (主版本) - ${baseVersion} -> ${incrementVersion(baseVersion, 'major')}`);
-    log(`  4. custom (自定义版本)`);
-    log(`  5. skip (跳过，使用当前版本)`);
+    // 检查是否通过参数指定了版本更新类型
+    let choice = null;
 
-    const choice = await askQuestion('\n请输入选项 (1-5): ');
-
-    switch (choice) {
-      case '1':
-        newVersion = incrementVersion(baseVersion, 'patch');
-        break;
-      case '2':
-        newVersion = incrementVersion(baseVersion, 'minor');
-        break;
-      case '3':
-        newVersion = incrementVersion(baseVersion, 'major');
-        break;
-      case '4':
-        newVersion = await askQuestion('请输入新版本号: ');
-        if (!/^\d+\.\d+\.\d+$/.test(newVersion)) {
-          log('❌ 无效的版本号格式，必须是 x.y.z 格式', 'red');
-          process.exit(1);
-        }
-        break;
-      case '5':
-        log('\n⏭️  跳过版本更新', 'yellow');
-        if (compareVersions(currentVersion, npmVersion) <= 0) {
-          log('❌ 错误: 版本号必须高于npm上的版本才能发布', 'red');
-          process.exit(1);
-        }
-        break;
-      default:
-        log('❌ 无效的选项', 'red');
+    if (flags.version) {
+      // 使用自定义版本号
+      newVersion = flags.version;
+      if (!/^\d+\.\d+\.\d+$/.test(newVersion)) {
+        log('❌ 无效的版本号格式，必须是 x.y.z 格式', 'red');
         process.exit(1);
+      }
+      log(`\n📝 使用指定版本号: ${newVersion}`, 'blue');
+    } else if (flags.patch) {
+      newVersion = incrementVersion(baseVersion, 'patch');
+      log(`\n📝 自动选择 patch 版本: ${baseVersion} -> ${newVersion}`, 'blue');
+    } else if (flags.minor) {
+      newVersion = incrementVersion(baseVersion, 'minor');
+      log(`\n📝 自动选择 minor 版本: ${baseVersion} -> ${newVersion}`, 'blue');
+    } else if (flags.major) {
+      newVersion = incrementVersion(baseVersion, 'major');
+      log(`\n📝 自动选择 major 版本: ${baseVersion} -> ${newVersion}`, 'blue');
+    } else {
+      // 交互式选择版本
+      log('\n请选择版本更新类型:', 'bright');
+      log(`  1. patch (补丁) - ${baseVersion} -> ${incrementVersion(baseVersion, 'patch')}`);
+      log(`  2. minor (次版本) - ${baseVersion} -> ${incrementVersion(baseVersion, 'minor')}`);
+      log(`  3. major (主版本) - ${baseVersion} -> ${incrementVersion(baseVersion, 'major')}`);
+      log(`  4. custom (自定义版本)`);
+      log(`  5. skip (跳过，使用当前版本)`);
+
+      choice = await askQuestion('\n请输入选项 (1-5): ');
+
+      switch (choice) {
+        case '1':
+          newVersion = incrementVersion(baseVersion, 'patch');
+          break;
+        case '2':
+          newVersion = incrementVersion(baseVersion, 'minor');
+          break;
+        case '3':
+          newVersion = incrementVersion(baseVersion, 'major');
+          break;
+        case '4':
+          newVersion = await askQuestion('请输入新版本号: ');
+          if (!/^\d+\.\d+\.\d+$/.test(newVersion)) {
+            log('❌ 无效的版本号格式，必须是 x.y.z 格式', 'red');
+            process.exit(1);
+          }
+          break;
+        case '5':
+          log('\n⏭️  跳过版本更新', 'yellow');
+          if (compareVersions(currentVersion, npmVersion) <= 0) {
+            log('❌ 错误: 版本号必须高于npm上的版本才能发布', 'red');
+            process.exit(1);
+          }
+          break;
+        default:
+          log('❌ 无效的选项', 'red');
+          process.exit(1);
+      }
     }
 
     // 更新package.json中的版本
@@ -237,10 +333,14 @@ async function main() {
   log(`   版本: ${newVersion}`);
   log(`   分支: ${currentBranch}`);
 
-  const confirmPublish = await askQuestion('\n确认发布? (y/n): ');
-  if (confirmPublish.toLowerCase() !== 'y') {
-    log('❌ 发布已取消', 'red');
-    process.exit(0);
+  if (!flags.yes && !flags.skipConfirm) {
+    const confirmPublish = await askQuestion('\n确认发布? (y/n): ');
+    if (confirmPublish.toLowerCase() !== 'y') {
+      log('❌ 发布已取消', 'red');
+      process.exit(0);
+    }
+  } else {
+    log('\n✅ 自动确认发布（使用 --yes 或 --skip-confirm 参数）', 'green');
   }
 
   // 8. 构建项目
