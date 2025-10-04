@@ -520,7 +520,7 @@ async function startWebServer(): Promise<void> {
               configs.push({
                 sessionId,
                 stepNumber,
-                title: gatherData.projectName || gatherData.projectIdea || '未命名项目',
+                title: stepNumber + '-' + (gatherData.projectName || gatherData.projectIdea || '未命名项目'),
                 projectIdea: gatherData.projectIdea || '',
                 filePath: gatherResponsePath,
                 fileName: fileName,
@@ -580,7 +580,7 @@ async function startWebServer(): Promise<void> {
               projects.push({
                 sessionId,
                 stepNumber,
-                title: buildData.title || buildData.projectIdea || '未命名项目',
+                title: stepNumber + '-' + (buildData.title || buildData.projectIdea || '未命名项目'),
                 projectIdea: buildData.projectIdea || '',
                 filePath: buildResponsePath,
                 fileName: fileName,
