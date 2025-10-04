@@ -350,7 +350,7 @@ mcpServer.registerTool(
 
 // 注册工具5：快速了解 Spec Kit 指令
 mcpServer.registerTool(
-  "learn_speckit_commands",
+  "learn_speckit",
   {
     description: "快速了解 Spec Kit 的所有指令和开发流程。打开一个交互式网页，详细介绍每个命令的用途、使用方法和最佳实践。",
     inputSchema: {

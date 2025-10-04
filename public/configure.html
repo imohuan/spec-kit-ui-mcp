@@ -69,7 +69,7 @@
             <select v-model="selectedProject" @change="handleProjectChange"
               class="w-full px-4 py-3 text-lg border-2 border-purple-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors bg-white cursor-pointer hover:border-purple-400">
               <option v-for="project in projects" :key="project.filePath" :value="project.filePath">
-                {{ project.filePath }}
+                {{ project.title }}
               </option>
             </select>
           </div>
